@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'bookings.json');
-
-function ensureDataFile() {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
-  }
-}
-
-function readBookings() {
-  ensureDataFile();
-  const data = fs.readFileSync(DATA_FILE, 'utf-8');
-  return JSON.parse(data);
-}
-
-function writeBookings(bookings: any[]) {
-  ensureDataFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(bookings, null, 2));
-}
+// ⚠️ 注意：生产环境请使用数据库（Vercel KV / Supabase / 飞书多维表格）
+// 当前使用内存存储，重启后会丢失数据（仅用于演示）
+let bookings: any[] = [];
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +17,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bookings = readBookings();
     const newBooking = {
       id: Date.now().toString(),
       name,
@@ -50,7 +28,6 @@ export async function POST(request: NextRequest) {
     };
 
     bookings.push(newBooking);
-    writeBookings(bookings);
 
     return NextResponse.json({
       success: true,
@@ -77,13 +54,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const bookings = readBookings();
     // 按创建时间倒序排列
-    bookings.sort((a: any, b: any) => 
+    const sortedBookings = [...bookings].sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    return NextResponse.json({ bookings });
+    return NextResponse.json({ bookings: sortedBookings });
   } catch (error) {
     console.error('Get bookings error:', error);
     return NextResponse.json(
@@ -114,8 +90,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const bookings = readBookings();
-    const index = bookings.findIndex((b: any) => b.id === id);
+    const index = bookings.findIndex((b) => b.id === id);
 
     if (index === -1) {
       return NextResponse.json(
@@ -126,7 +101,6 @@ export async function PATCH(request: NextRequest) {
 
     bookings[index].status = status;
     bookings[index].updatedAt = new Date().toISOString();
-    writeBookings(bookings);
 
     return NextResponse.json({ success: true });
   } catch (error) {
